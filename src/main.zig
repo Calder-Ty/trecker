@@ -4,6 +4,34 @@ const zli = @import("zli");
 const exe_name = "trecker";
 const session_file_name = exe_name ++ "_session.ini";
 
+const MonthMapPair = struct { []const u8, u4 };
+
+const months = std.static_string_map.StaticStringMap(u4).initComptime([_]MonthMapPair{
+    .{ "january", 1 },
+    .{ "jan", 1 },
+    .{ "febuary", 2 },
+    .{ "feb", 2 },
+    .{ "march", 3 },
+    .{ "mar", 3 },
+    .{ "april", 4 },
+    .{ "apr", 4 },
+    .{ "may", 5 },
+    .{ "june", 6 },
+    .{ "jun", 6 },
+    .{ "july", 7 },
+    .{ "jul", 7 },
+    .{ "august", 8 },
+    .{ "aug", 8 },
+    .{ "september", 9 },
+    .{ "sep", 9 },
+    .{ "october", 10 },
+    .{ "oct", 10 },
+    .{ "november", 11 },
+    .{ "nov", 11 },
+    .{ "december", 12 },
+    .{ "dec", 12 },
+});
+
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
@@ -16,13 +44,9 @@ pub fn main() !void {
     try switch (command) {
         .init => executeInitCommand(allocator),
         .start => |args| executeStartCommand(allocator, args.positional.project_id),
-        .add => |args| executeAddCommand(
-            allocator, args.positional.project_id, args.positional.project_name
-        ),
+        .add => |args| executeAddCommand(allocator, args.positional.project_id, args.positional.project_name),
         .list => executeListCommand(allocator),
-        .summary => |args| executeSummaryCommand(
-            allocator, args.positional.month, args.positional.year
-        ),
+        .summary => |args| executeSummaryCommand(allocator, args.positional.month, args.positional.year),
     };
 }
 
@@ -43,10 +67,7 @@ fn executeInitCommand(allocator: std.mem.Allocator) !void {
     };
 
     if (file_exists) {
-        fatal(
-            "Session file '{s}' already exists. Delete manually to create a new session.",
-            .{ session_file_name }
-        );
+        fatal("Session file '{s}' already exists. Delete manually to create a new session.", .{session_file_name});
     }
 
     const store = Store{
@@ -57,28 +78,9 @@ fn executeInitCommand(allocator: std.mem.Allocator) !void {
 }
 
 fn executeSummaryCommand(allocator: std.mem.Allocator, month_str: []const u8, year_str: []const u8) !void {
-    const month_names: []const []const u8 = &.{
-        "january",
-        "february",
-        "march",
-        "april",
-        "may",
-        "june",
-        "july",
-        "august",
-        "september",
-        "october",
-        "november",
-        "december",
-    };
-    const month: u4 = for (month_names, 1..) |month_name, number| {
-        if (std.mem.eql(u8, month_str, month_name)) {
-            break @intCast(number);
-        }
-    } else {
+    const month = months.get(month_str) orelse {
         fatal("Unknown month: '{s}'", .{month_str});
     };
-
     const year = try std.fmt.parseInt(u16, year_str, 10);
 
     var project_hours = std.MultiArrayList(struct { p: *Project, h: f64 }){};
@@ -219,9 +221,7 @@ const Store = struct {
         extra_entry: bool = false,
     };
     fn deserialize(allocator: std.mem.Allocator, options: DeserializeOptions) !Store {
-        const text = std.fs.cwd().readFileAlloc(
-            allocator, session_file_name, 1024 * 1024 * 1024
-        ) catch |err| switch (err) {
+        const text = std.fs.cwd().readFileAlloc(allocator, session_file_name, 1024 * 1024 * 1024) catch |err| switch (err) {
             error.FileNotFound => fatal(
                 "Session file {s} was not found in the working directory. Run 'trecker init' to create a fresh one.",
                 .{session_file_name},
@@ -230,7 +230,8 @@ const Store = struct {
         };
         defer allocator.free(text);
         return parse(allocator, options, text) catch |err| fatal(
-            "{s}: parse error: {s}", .{session_file_name, @errorName(err)},
+            "{s}: parse error: {s}",
+            .{ session_file_name, @errorName(err) },
         );
     }
 
@@ -311,7 +312,6 @@ const Store = struct {
 
         try std.fs.cwd().writeFile(.{ .sub_path = session_file_name, .data = text.items });
     }
-
 };
 
 fn getTrimmedValue(line: []const u8, comptime name: []const u8) ?[]const u8 {
